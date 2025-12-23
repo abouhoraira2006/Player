@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAudioPlayer as useExpoAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Audio, InterruptionModeAndroid } from 'expo-av';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Track } from './useMediaLibrary';
 
 export const useAudioPlayer = (tracks: Track[]) => {
@@ -7,11 +9,17 @@ export const useAudioPlayer = (tracks: Track[]) => {
     const [isShuffle, setIsShuffle] = useState(false);
     const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
 
-    // We use a specific player for the current track
-    const player = useExpoAudioPlayer(currentTrack?.uri || null);
+    // Keep the CPU awake whenever the player is active
+    useKeepAwake();
+
+    // Persistent player with background support enabled
+    const player = useExpoAudioPlayer(currentTrack?.uri || null, {
+        updateInterval: 500,
+        keepAudioSessionActive: true,
+    });
     const status = useAudioPlayerStatus(player);
 
-    // Sync metadata and enable background playback
+    // Sync metadata and enable system-level background playback
     useEffect(() => {
         if (currentTrack && player) {
             const metadata = {
@@ -20,7 +28,7 @@ export const useAudioPlayer = (tracks: Track[]) => {
                 albumTitle: 'Your Library',
             };
 
-            // Activate lock screen controls
+            // This tells the OS to keep the audio active for lock screen/background
             player.setActiveForLockScreen(true, metadata, {
                 showSeekForward: true,
                 showSeekBackward: true,
@@ -28,13 +36,14 @@ export const useAudioPlayer = (tracks: Track[]) => {
         }
     }, [currentTrack, player]);
 
-    // Auto-play when track changes
+    // Auto-play when track is selected
     useEffect(() => {
-        if (currentTrack) {
+        if (currentTrack && player) {
             player.play();
         }
     }, [currentTrack, player]);
 
+    // Handle track finishing
     useEffect(() => {
         if (status.didJustFinish) {
             if (repeatMode === 'one') {
@@ -80,7 +89,7 @@ export const useAudioPlayer = (tracks: Track[]) => {
     }, [player, status.playing]);
 
     const seek = useCallback((millis: number) => {
-        player.seekTo(millis);
+        player.seekTo(millis / 1000);
     }, [player]);
 
     const toggleShuffle = () => setIsShuffle(!isShuffle);
@@ -94,8 +103,8 @@ export const useAudioPlayer = (tracks: Track[]) => {
     return {
         isPlaying: status.playing,
         currentTrack,
-        position: status.currentTime,
-        duration: status.duration,
+        position: (status.currentTime || 0) * 1000,
+        duration: (status.duration || 0) * 1000,
         isShuffle,
         repeatMode,
         playTrack,

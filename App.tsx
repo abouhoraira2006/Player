@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, FlatList, ActivityIndicator, SafeAreaView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, FlatList, ActivityIndicator, SafeAreaView, TouchableOpacity, Linking } from 'react-native';
+import { Audio, InterruptionModeAndroid } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { ScreenLayout } from './src/components/ScreenLayout';
@@ -9,6 +10,7 @@ import { useMediaLibrary, Track } from './src/hooks/useMediaLibrary';
 import { useAudioPlayer } from './src/hooks/useAudioPlayer';
 import { GlassContainer } from './src/components/GlassContainer';
 import { PlayerModal } from './src/components/PlayerModal';
+import { YouTubeMusicModal } from './src/components/YouTubeMusicModal';
 
 const formatTime = (millis: number) => {
   if (!millis || millis < 0) return '0:00';
@@ -21,6 +23,23 @@ const formatTime = (millis: number) => {
 export default function App() {
   const { tracks, loading, error } = useMediaLibrary();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isYouTubeModalVisible, setIsYouTubeModalVisible] = useState(false);
+
+  useEffect(() => {
+    async function setupAudio() {
+      try {
+        await Audio.setAudioModeAsync({
+          staysActiveInBackground: true,
+          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (e) {
+        console.error('Failed to set audio mode:', e);
+      }
+    }
+    setupAudio();
+  }, []);
   const {
     currentTrack,
     isPlaying,
@@ -43,8 +62,21 @@ export default function App() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={styles.title}>Your Library</Text>
-      <Text style={styles.subtitle}>{tracks.length} Tracks found</Text>
+      <View style={styles.headerContent}>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.title}>Your Library</Text>
+          <Text style={styles.subtitle}>{tracks.length} Tracks found</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => setIsYouTubeModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <GlassContainer style={styles.youtubeIconButton} intensity={40}>
+            <Ionicons name="logo-youtube" size={28} color="#FF0000" />
+          </GlassContainer>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -132,6 +164,11 @@ export default function App() {
               repeatMode={repeatMode}
               toggleRepeat={toggleRepeat}
             />
+
+            <YouTubeMusicModal
+              visible={isYouTubeModalVisible}
+              onClose={() => setIsYouTubeModalVisible(false)}
+            />
           </>
         )}
       </SafeAreaView>
@@ -146,6 +183,14 @@ const styles = StyleSheet.create({
   header: {
     padding: SPACING.xl,
     paddingTop: SPACING.xxl,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   center: {
     flex: 1,
@@ -225,6 +270,15 @@ const styles = StyleSheet.create({
   },
   miniPlayBtn: {
     padding: SPACING.xs,
+  },
+  youtubeIconButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 0, 0.3)',
   },
 });
 
